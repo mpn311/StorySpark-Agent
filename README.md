@@ -6,21 +6,26 @@ Built with **LangGraph**, **ChromaDB**, **NVIDIA LLMs**, and **Streamlit**.
 
 ## 🚀 Features
 
-- **Custom Characters Database**  
+- **Custom Character Database**  
   Add, edit, delete, and reuse your own characters.  
   Stored in ChromaDB with semantic search via NVIDIA embeddings.
 
 - **Scene-by-Scene Story Generation**  
   Story is generated in multiple scenes.  
-  Each scene uses retrieved characters + story prompt.
+  Each scene uses the user prompt + retrieved characters.
 
 - **LangGraph Workflow**  
-  Manages retrieval → generation → feedback loop for consistent storytelling.
+  Handles character retrieval → scene generation → feedback loop.
 
 - **Regenerate & Rewrite Scenes**  
-  Modify scenes with custom instructions (tone, detail, emotion, etc.).
+  Users can regenerate scenes or rewrite them with custom instructions  
+  (tone, detail, mood, simplicity, etc.).
 
-## Workflow
+---
+
+## 🔄 Workflow
+
+```text
                 ┌─────────────────────────┐
                 │  User Enters Story       │
                 │  Prompt + (Title)        │
@@ -37,10 +42,10 @@ Built with **LangGraph**, **ChromaDB**, **NVIDIA LLMs**, and **Streamlit**.
                             ▼
                 ┌─────────────────────────┐
                 │  Scene Generation        │
-                │  NVIDIA LLM creates      │
-                │  Scene N using:          │
-                │   - Prompt               │
-                │   - Retrieved characters │
+                │  NVIDIA LLM creates:     │
+                │   - Scene N              │
+                │   - Using prompt         │
+                │   - + Retrieved chars    │
                 └───────────┬─────────────┘
                             │
                             ▼
@@ -74,34 +79,18 @@ Built with **LangGraph**, **ChromaDB**, **NVIDIA LLMs**, and **Streamlit**.
                            ▼
                 (Loop back to Scene Generation)
 
-
                            ▼ No
                 ┌─────────────────────────┐
-                │  Story Assembly          │
-                │  • Combine all scenes   │
-                │  • Add title            │
+                │     Story Assembly       │
+                │  • Combine scenes        │
+                │  • Add title             │
                 └───────────┬─────────────┘
                             │
                             ▼
                 ┌─────────────────────────┐
-                │ Download / Export Story  │
-                │  story.txt               │
+                │  Download / Export       │
+                │     story.txt            │
                 └───────────┬─────────────┘
                             │
                             ▼
                            END
-
-
-
-## 🧠 Tech Stack
-
-| Component | Technology |
-|----------|------------|
-| Story generation | NVIDIA LLM (Llama-3.1-8B-Instruct) |
-| Character embeddings | NVIDIA NV-Embed-v1 |
-| Vector DB | ChromaDB |
-| Orchestration | LangGraph |
-| UI | Streamlit |
-| Environment | Python 3.10+ |
-
----
