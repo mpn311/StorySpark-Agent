@@ -56,7 +56,7 @@ The following diagram illustrates the core LangGraph-managed process for generat
         │ ✏️ Custom → Apply user's changes ───────────►  (Back to Scene Generation) 
         └────────────────────────────────────────────────────────────────────────────┘
                                 │
-                                │ (Only when Accept)
+                                │ 
                                 ▼
                     ┌─────────────────────────┐
                     │ 📚 Story Assembly       |
@@ -72,3 +72,27 @@ The following diagram illustrates the core LangGraph-managed process for generat
                                 │
                                 ▼
                                END
+
+## 📘 Example: How to Create a Story
+### Enter a Story Prompt
+Once your characters are added, enter a simple story prompt like this:
+
+> **A strange dark cloud appears above Dholakpur, and people suddenly start losing their strength.  
+> Bheem, Chutki, Raju, and Jaggu must find the reason behind this power-draining cloud before it spreads to the whole village.  
+> Meanwhile, Kalia tries to prove he is the strongest, but his plans only create more trouble.  
+> Can the team stop the danger before sunset?**
+
+
+
+## 🧠 Tech Stack
+
+| Component | Technology |
+|----------|------------|
+| Story generation | NVIDIA LLM (Llama-3.1-8B-Instruct) |
+| Character embeddings | NVIDIA NV-Embed-v1 |
+| Vector DB | ChromaDB |
+| Orchestration | LangGraph |
+| UI | Streamlit |
+| Environment | Python 3.10+ |
+
+---
