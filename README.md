@@ -6,6 +6,13 @@ Built with **LangGraph**, **ChromaDB**, **NVIDIA LLMs**, and **Streamlit**.
 
 ---
 
+## 🚀 Live Demo
+
+You can try the working app here:
+
+👉 **https://storyspark-agent.streamlit.app/**
+
+
 ## 🚀 Features
 
 * **Custom Character Database:** Add, edit, delete, and reuse your own characters. Stored in **ChromaDB** with semantic search via **NVIDIA embeddings**.
