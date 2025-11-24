@@ -20,56 +20,55 @@ Built with **LangGraph**, **ChromaDB**, **NVIDIA LLMs**, and **Streamlit**.
 The following diagram illustrates the core LangGraph-managed process for generating and refining each scene of the story.
 
 ```text
-                       Start
-                          │
-                          ▼
-              ┌─────────────────────────┐
-              │ 📝 User Enters Story    │
-              │   Prompt + (Title)      │
-              └───────────┬─────────────┘
-                          │
-                          ▼
-              ┌─────────────────────────┐
-              │ 🧑 Character Retrieval   │
-              └───────────┬─────────────┘
-                          │
-                          ▼
-              ┌─────────────────────────┐     ◀──────────────────────────┐
-              │ ✍️ Scene Generation     │                                |
-              └───────────┬─────────────┘                                 │
-                          │                                               │
-                          ▼                                               │
-              ┌─────────────────────────┐                                 │
-              │ 👁️ Display Scene        │                                |
-              │       to User           │                                 │
-              └───────────┬─────────────┘                                 │
-                          │                                               │
-                          ▼                                               │
-        ┌──────────────────────────────────────────────────────────────────┐
-        │                         🔍 DECISION BLOCK                        
-        ├──────────────────────────────────────────────────────────────────┤
-        │ ✔ Yes     → Proceed to Story Assembly                            |
-        ├──────────────────────────────────────────────────────────────────┤
-        │ ❌ No      → Regenerate Scene                                    |
-        │               (Loop back to ✍️ Scene Generation)                 |
-        ├──────────────────────────────────────────────────────────────────┤
-        │ ✏️ Custom  → Apply Changes                                       |
-        │               (Return to ✍️ Scene Generation)                    |
-        └──────────────────────────────────────────────────────────────────┘
-                          │
-                          │ (Only when Yes / Accept)
-                          ▼
-              ┌─────────────────────────┐
-              │ 📚 Story Assembly       │
-              │ • Combine all scenes    │
-              │ • Add title/formatting  │
-              └───────────┬─────────────┘
-                          │
-                          ▼
-              ┌─────────────────────────┐
-              │ 💾 Download / Export    │
-              │   story.txt / .pdf      │
-              └───────────┬─────────────┘
-                          │
-                          ▼
-                         END
+                              Start
+                                │
+                                ▼
+                    ┌─────────────────────────┐
+                    │ 📝 User Enters Story     │
+                    │    Prompt + (Title)      │
+                    └───────────┬─────────────┘
+                                │
+                                ▼
+                    ┌─────────────────────────┐
+                    │ 🧑 Character Retrieval    │
+                    └───────────┬─────────────┘
+                                │
+                                ▼
+                    ┌─────────────────────────┐ 
+                    │ ✍️ Scene Generation     ◀───────────────────────────────┐
+                    │   (LLM Generates Scene) │                                │
+                    └───────────┬─────────────┘                                │
+                                │                                              │
+                                ▼                                              │
+                    ┌─────────────────────────┐                                │
+                    │ 👁️ Display Scene                                        │
+                    │       to User                                            │
+                    └───────────┬─────────────┘                                │
+                                │                                              │
+                                ▼                                              │
+        ┌────────────────────────────────────────────────────────────────────────────┐
+        │                          🔍 DECISION BLOCK                                                 
+        ├────────────────────────────────────────────────────────────────────────────┤
+        │ ✔ Accept  → Proceed to         ───────────►    Generation next Scene               
+        ├────────────────────────────────────────────────────────────────────────────┤
+        │ ❌ Reject  → Re-generate Scene  ─────────────► (Back to Scene Generation) 
+        ├────────────────────────────────────────────────────────────────────────────┤
+        │ ✏️ Custom → Apply user's changes ───────────►  (Back to Scene Generation) 
+        └────────────────────────────────────────────────────────────────────────────┘
+                                │
+                                │ (Only when Accept)
+                                ▼
+                    ┌─────────────────────────┐
+                    │ 📚 Story Assembly       |
+                    │ • Combine all scenes     |
+                    │ • Add title/formatting   │
+                    └───────────┬─────────────┘
+                                │
+                                ▼
+                    ┌─────────────────────────┐
+                    │ 💾 Download / Export     
+                    │   story.txt / story.pdf  
+                    └───────────┬─────────────┘
+                                │
+                                ▼
+                               END
