@@ -71,7 +71,7 @@ The following diagram illustrates the core LangGraph-managed process for generat
                     └───────────┬─────────────┘
                                 │
                                 ▼
-                               END
+                               END  '''
 
 ## 📘 Example: How to Create a Story
 ### Enter a Story Prompt
