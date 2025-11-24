@@ -2,7 +2,7 @@
 
 An interactive AI-powered story generation application that creates scene-wise stories using your own custom characters.
 
-Built with **LangGraph**, **ChromaDB**, **(Llama-3.1-8B-Instruct)**, and **Streamlit**.
+Built with **LangGraph**, **ChromaDB**, **LLM(Llama-3.1-8B-Instruct)**, and **Streamlit**.
 
 ---
 
