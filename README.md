@@ -89,8 +89,7 @@ The following diagram illustrates the core LangGraph-managed process for generat
                                 │
                                 ▼
                     ┌─────────────────────────┐
-                    │ 💾 Download / Export     
-                    │   story.txt / story.pdf  
+                    │ 💾 Download / Export      
                     └───────────┬─────────────┘
                                 │
                                 ▼
