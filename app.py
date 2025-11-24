@@ -5,11 +5,15 @@ from typing import List, Dict, Any
 
 from dotenv import load_dotenv
 
+# ============================
 # Torch shim for Windows
+# ============================
+# Some environments (especially Windows / Streamlit Cloud) can complain
+# if torch.classes is not present. This shim avoids import issues.
 if "torch.classes" not in sys.modules:
     sys.modules["torch.classes"] = types.ModuleType("torch.classes")
 
-# Load .env
+# Load .env for local dev (Streamlit Cloud can use Secrets instead)
 load_dotenv()
 
 import streamlit as st
@@ -32,10 +36,13 @@ LLM_MODEL = "meta/llama-3.1-8b-instruct"
 EMBED_MODEL = "nvidia/nv-embed-v1"
 MAX_SCENES = 3
 
-# Performance optimizations
+# Performance / style
 TEMPERATURE = 0.7
 MAX_TOKENS = 200
 TOP_P = 0.9
+
+# Where to store Chroma DB (works on Streamlit Cloud too)
+CHROMA_DIR = os.path.join(os.getcwd(), "chroma_db")
 
 
 # =============================================================
@@ -48,11 +55,11 @@ def get_llm():
         return None
     try:
         return ChatNVIDIA(
-            model=LLM_MODEL, 
+            model=LLM_MODEL,
             api_key=NVIDIA_API_KEY,
             temperature=TEMPERATURE,
             max_tokens=MAX_TOKENS,
-            top_p=TOP_P
+            top_p=TOP_P,
         )
     except Exception as e:
         st.error(f"LLM init error: {e}")
@@ -75,16 +82,24 @@ EMB = get_embeddings()
 
 
 # =============================================================
-# CHROMA DB
+# CHROMA DB (fixed for Streamlit Cloud)
 # =============================================================
 
 @st.cache_resource
 def init_chroma():
+    """
+    Try to use a persistent ChromaDB folder.
+    If that fails (e.g. permissions), fall back to in-memory.
+    This pattern works on Streamlit Cloud.
+    """
     try:
-        client = chromadb.PersistentClient(path="./chroma_db")
-    except Exception:
+        os.makedirs(CHROMA_DIR, exist_ok=True)
+        client = chromadb.PersistentClient(path=CHROMA_DIR)
+    except Exception as e:
+        # Fallback: in-memory client (will reset when app restarts)
+        st.warning(f"Using in-memory ChromaDB (persistence unavailable): {e}")
         client = chromadb.Client()
-    
+
     coll = client.get_or_create_collection("characters")
     return client, coll
 
@@ -95,7 +110,7 @@ CHROMA_CLIENT, COLLECTION = init_chroma()
 @st.cache_data(ttl=300)
 def embed_texts_cached(text: str):
     if EMB is None:
-        raise RuntimeError("Embeddings not initialized. Set NVIDIA_API_KEY in .env")
+        raise RuntimeError("Embeddings not initialized. Set NVIDIA_API_KEY in .env or Streamlit secrets.")
     return EMB.embed_documents([text])[0]
 
 
@@ -103,14 +118,16 @@ def add_or_update_character(name: str, description: str):
     vec = embed_texts_cached(description)
     try:
         COLLECTION.delete(ids=[name])
-    except:
+    except Exception:
         pass
+
     COLLECTION.add(
         ids=[name],
         documents=[description],
         embeddings=[vec],
         metadatas=[{"name": name}],
     )
+    # Clear caches that depend on character data
     st.cache_data.clear()
 
 
@@ -118,7 +135,7 @@ def delete_character(name: str):
     try:
         COLLECTION.delete(ids=[name])
         st.cache_data.clear()
-    except:
+    except Exception:
         pass
 
 
@@ -127,7 +144,7 @@ def list_character_names():
     try:
         data = COLLECTION.get()
         return data.get("ids", [])
-    except:
+    except Exception:
         return []
 
 
@@ -136,7 +153,7 @@ def get_character_description(name: str):
     try:
         data = COLLECTION.get(ids=[name])
         return data.get("documents", [""])[0]
-    except:
+    except Exception:
         return ""
 
 
@@ -153,7 +170,7 @@ def search_characters(query: str, top_k: int = 3):
             m = metas[i]
             output.append({"name": m["name"], "description": d})
         return output
-    except:
+    except Exception:
         return []
 
 
@@ -177,7 +194,7 @@ def node_retrieve(state: LGState) -> LGState:
     try:
         chars = search_characters(state.prompt, top_k=3)
         state.retrieved = "\n".join([f"- {c['name']}: {c['description']}" for c in chars])
-    except:
+    except Exception:
         state.retrieved = ""
     return state
 
@@ -194,7 +211,7 @@ Write clearly with short sentences."""
 
 def node_generate_scene(state: LGState) -> LGState:
     if LLM is None:
-        state.scene = "ERROR: LLM not initialized"
+        state.scene = "ERROR: LLM not initialized. Please set NVIDIA_API_KEY."
         return state
 
     prompt_text = make_scene_prompt(
@@ -234,7 +251,7 @@ workflow = graph.compile()
 st.title("🎭 StorySpark Agent")
 
 if not NVIDIA_API_KEY:
-    st.error("⚠️ NVIDIA_API_KEY missing in .env file!")
+    st.error("⚠️ NVIDIA_API_KEY missing! Set it in your .env (local) or Streamlit Secrets (cloud).")
     st.stop()
 
 # Session Setup
@@ -254,23 +271,23 @@ if "edit_char" not in st.session_state:
 
 with st.sidebar:
     st.header("📚 Character Database")
-    
+
     names = list_character_names()
-    
+
     if names:
         st.caption(f"📊 Total: {len(names)} characters")
         st.markdown("---")
-        
+
         # Character selection
         selected = st.selectbox(
             "Select character:",
             [""] + names,
             key="char_select"
         )
-        
+
         if selected:
             desc = get_character_description(selected)
-            
+
             st.markdown(f"**{selected}**")
             st.text_area(
                 "Description:",
@@ -280,59 +297,59 @@ with st.sidebar:
                 key=f"view_{selected}",
                 label_visibility="collapsed"
             )
-            
+
             col1, col2 = st.columns(2)
-            
+
             if col1.button("✏️ Edit", key=f"edit_{selected}", use_container_width=True):
                 st.session_state["edit_char"] = {"name": selected, "desc": desc}
                 st.rerun()
-            
+
             if col2.button("🗑 Delete", key=f"del_{selected}", use_container_width=True):
                 delete_character(selected)
                 st.success(f"Deleted {selected}")
                 st.rerun()
     else:
         st.info("No characters yet. Add your first character below!")
-    
+
     st.markdown("---")
-    
+
     # Add/Edit Form
     if st.session_state["edit_char"]:
         st.subheader("✏️ Edit Character")
         edit_data = st.session_state["edit_char"]
-        
+
         st.text_input(
             "Name:",
             edit_data["name"],
             disabled=True,
             key="edit_name_display"
         )
-        
+
         new_desc = st.text_area(
             "Description:",
             edit_data["desc"],
             height=150,
             key="edit_desc"
         )
-        
+
         col1, col2 = st.columns(2)
-        
+
         if col1.button("💾 Save", use_container_width=True):
             add_or_update_character(edit_data["name"], new_desc)
             st.session_state["edit_char"] = None
             st.success("✅ Updated!")
             st.rerun()
-        
+
         if col2.button("❌ Cancel", use_container_width=True):
             st.session_state["edit_char"] = None
             st.rerun()
-            
+
     else:
         st.subheader("➕ Add New Character")
-        
+
         cname = st.text_input("Name:", key="new_cname")
         cdesc = st.text_area("Description:", key="new_cdesc", height=120)
-        
+
         if st.button("💾 Save Character", use_container_width=True, type="primary"):
             if cname and cdesc:
                 add_or_update_character(cname, cdesc)
@@ -349,8 +366,12 @@ with st.sidebar:
 st.header("📝 Build Stories with Your Own Characters")
 
 story_title = st.text_input("Story Title (optional):", key="story_title")
-prompt_text = st.text_area("Story Prompt:", height=120, key="story_prompt", 
-                           placeholder="Enter your story idea here...")
+prompt_text = st.text_area(
+    "Story Prompt:",
+    height=120,
+    key="story_prompt",
+    placeholder="Enter your story idea here..."
+)
 
 if st.button("🚀 Generate Scene 1", type="primary"):
     if not prompt_text.strip():
@@ -380,25 +401,25 @@ if st.session_state["lg_state"]:
 
     st.markdown("---")
     st.subheader(f"📘 Scene {sn}")
-    
+
     if story_title:
         st.markdown(f"### **{story_title}**")
-    
+
     # Scene content in a nice container
     with st.container():
         st.markdown(s["scene"])
 
-
     st.markdown("---")
-    
+
     col1, col2 = st.columns(2)
-    
+
+    # Accept & Continue
     with col1:
         if st.button("✅ Accept & Continue", use_container_width=True, type="primary"):
             if sn >= MAX_SCENES:
-                st.info("✔ Story complete! All 3 scenes generated.")
+                st.info("✔ Story complete! All scenes generated.")
             else:
-                with st.spinner(f"✨ Generating scene {sn+1}..."):
+                with st.spinner(f"✨ Generating scene {sn + 1}..."):
                     next_state = LGState(
                         prompt=s["prompt"],
                         retrieved=s["retrieved"],
@@ -411,11 +432,12 @@ if st.session_state["lg_state"]:
                         st.session_state["lg_state"] = result2_dict
                         st.session_state["scenes"][sn + 1] = result2_dict["scene"]
 
-                        st.success(f"✅ Scene {sn+1} ready!")
+                        st.success(f"✅ Scene {sn + 1} ready!")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error: {str(e)}")
-    
+
+    # Regenerate current scene
     with col2:
         if st.button("🔄 Regenerate Scene", use_container_width=True):
             with st.spinner("✨ Regenerating..."):
@@ -435,7 +457,7 @@ if st.session_state["lg_state"]:
                     st.rerun()
                 except Exception as e:
                     st.error(f"Error: {str(e)}")
-    
+
     # Custom changes expander
     with st.expander("✏️ Make Custom Changes"):
         change_instructions = st.text_area(
@@ -443,7 +465,7 @@ if st.session_state["lg_state"]:
             placeholder="e.g., Make it more emotional, add action, change the tone...",
             height=80
         )
-        
+
         if st.button("Apply Changes", type="primary"):
             if not change_instructions.strip():
                 st.error("Please describe what to change.")
@@ -479,23 +501,30 @@ Rewritten scene:"""
 if len(st.session_state["scenes"]) > 1:
     st.markdown("---")
     st.subheader("📖 Complete Story")
-    
+
+    # `sn` might not exist if user just generated but no lg_state yet, so guard
+    current_scene_number = (
+        st.session_state["lg_state"]["scene_number"]
+        if st.session_state["lg_state"]
+        else 1
+    )
+
     for k in sorted(st.session_state["scenes"].keys()):
-        with st.expander(f"Scene {k}", expanded=(k == sn if st.session_state["lg_state"] else True)):
+        with st.expander(f"Scene {k}", expanded=(k == current_scene_number)):
             st.write(st.session_state["scenes"][k])
-    
+
     # Export option
     if len(st.session_state["scenes"]) == MAX_SCENES:
         st.markdown("---")
-        
+
         full_story = "\n\n---\n\n".join([
-            f"Scene {k}\n\n{st.session_state['scenes'][k]}" 
+            f"Scene {k}\n\n{st.session_state['scenes'][k]}"
             for k in sorted(st.session_state["scenes"].keys())
         ])
-        
+
         if story_title:
             full_story = f"{story_title}\n\n{full_story}"
-        
+
         st.download_button(
             "📥 Download Complete Story",
             full_story,
