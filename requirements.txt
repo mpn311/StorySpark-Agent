@@ -1,0 +1,8 @@
+streamlit
+python-dotenv
+chromadb
+langgraph
+pydantic
+langchain-nvidia-ai-endpoints
+torch
+typing_extensions
