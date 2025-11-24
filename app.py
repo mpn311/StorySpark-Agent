@@ -5,15 +5,11 @@ from typing import List, Dict, Any
 
 from dotenv import load_dotenv
 
-# ============================
 # Torch shim for Windows
-# ============================
-# Some environments (especially Windows / Streamlit Cloud) can complain
-# if torch.classes is not present. This shim avoids import issues.
 if "torch.classes" not in sys.modules:
     sys.modules["torch.classes"] = types.ModuleType("torch.classes")
 
-# Load .env for local dev (Streamlit Cloud can use Secrets instead)
+# Load .env
 load_dotenv()
 
 import streamlit as st
@@ -36,13 +32,10 @@ LLM_MODEL = "meta/llama-3.1-8b-instruct"
 EMBED_MODEL = "nvidia/nv-embed-v1"
 MAX_SCENES = 3
 
-# Performance / style
+# Performance optimizations
 TEMPERATURE = 0.7
 MAX_TOKENS = 200
 TOP_P = 0.9
-
-# Where to store Chroma DB (works on Streamlit Cloud too)
-CHROMA_DIR = os.path.join(os.getcwd(), "chroma_db")
 
 
 # =============================================================
@@ -59,7 +52,7 @@ def get_llm():
             api_key=NVIDIA_API_KEY,
             temperature=TEMPERATURE,
             max_tokens=MAX_TOKENS,
-            top_p=TOP_P,
+            top_p=TOP_P
         )
     except Exception as e:
         st.error(f"LLM init error: {e}")
@@ -82,23 +75,20 @@ EMB = get_embeddings()
 
 
 # =============================================================
-# CHROMA DB (fixed for Streamlit Cloud)
+# CHROMA DB
 # =============================================================
 
 @st.cache_resource
 def init_chroma():
     """
-    Try to use a persistent ChromaDB folder.
-    If that fails (e.g. permissions), fall back to in-memory.
-    This pattern works on Streamlit Cloud.
+    Use in-memory Chroma client so it works reliably on Streamlit Cloud.
+    (No filesystem persistence; data resets when app restarts.)
     """
     try:
-        os.makedirs(CHROMA_DIR, exist_ok=True)
-        client = chromadb.PersistentClient(path=CHROMA_DIR)
+        client = chromadb.Client()  # In-memory, Streamlit Cloud friendly
     except Exception as e:
-        # Fallback: in-memory client (will reset when app restarts)
-        st.warning(f"Using in-memory ChromaDB (persistence unavailable): {e}")
-        client = chromadb.Client()
+        st.error(f"Chroma init error: {e}")
+        raise e
 
     coll = client.get_or_create_collection("characters")
     return client, coll
@@ -110,7 +100,7 @@ CHROMA_CLIENT, COLLECTION = init_chroma()
 @st.cache_data(ttl=300)
 def embed_texts_cached(text: str):
     if EMB is None:
-        raise RuntimeError("Embeddings not initialized. Set NVIDIA_API_KEY in .env or Streamlit secrets.")
+        raise RuntimeError("Embeddings not initialized. Set NVIDIA_API_KEY in .env")
     return EMB.embed_documents([text])[0]
 
 
@@ -118,16 +108,14 @@ def add_or_update_character(name: str, description: str):
     vec = embed_texts_cached(description)
     try:
         COLLECTION.delete(ids=[name])
-    except Exception:
+    except:
         pass
-
     COLLECTION.add(
         ids=[name],
         documents=[description],
         embeddings=[vec],
         metadatas=[{"name": name}],
     )
-    # Clear caches that depend on character data
     st.cache_data.clear()
 
 
@@ -135,7 +123,7 @@ def delete_character(name: str):
     try:
         COLLECTION.delete(ids=[name])
         st.cache_data.clear()
-    except Exception:
+    except:
         pass
 
 
@@ -144,7 +132,7 @@ def list_character_names():
     try:
         data = COLLECTION.get()
         return data.get("ids", [])
-    except Exception:
+    except:
         return []
 
 
@@ -153,7 +141,7 @@ def get_character_description(name: str):
     try:
         data = COLLECTION.get(ids=[name])
         return data.get("documents", [""])[0]
-    except Exception:
+    except:
         return ""
 
 
@@ -170,7 +158,7 @@ def search_characters(query: str, top_k: int = 3):
             m = metas[i]
             output.append({"name": m["name"], "description": d})
         return output
-    except Exception:
+    except:
         return []
 
 
@@ -194,7 +182,7 @@ def node_retrieve(state: LGState) -> LGState:
     try:
         chars = search_characters(state.prompt, top_k=3)
         state.retrieved = "\n".join([f"- {c['name']}: {c['description']}" for c in chars])
-    except Exception:
+    except:
         state.retrieved = ""
     return state
 
@@ -211,7 +199,7 @@ Write clearly with short sentences."""
 
 def node_generate_scene(state: LGState) -> LGState:
     if LLM is None:
-        state.scene = "ERROR: LLM not initialized. Please set NVIDIA_API_KEY."
+        state.scene = "ERROR: LLM not initialized"
         return state
 
     prompt_text = make_scene_prompt(
@@ -251,7 +239,7 @@ workflow = graph.compile()
 st.title("🎭 StorySpark Agent")
 
 if not NVIDIA_API_KEY:
-    st.error("⚠️ NVIDIA_API_KEY missing! Set it in your .env (local) or Streamlit Secrets (cloud).")
+    st.error("⚠️ NVIDIA_API_KEY missing in .env file!")
     st.stop()
 
 # Session Setup
@@ -413,13 +401,12 @@ if st.session_state["lg_state"]:
 
     col1, col2 = st.columns(2)
 
-    # Accept & Continue
     with col1:
         if st.button("✅ Accept & Continue", use_container_width=True, type="primary"):
             if sn >= MAX_SCENES:
-                st.info("✔ Story complete! All scenes generated.")
+                st.info("✔ Story complete! All 3 scenes generated.")
             else:
-                with st.spinner(f"✨ Generating scene {sn + 1}..."):
+                with st.spinner(f"✨ Generating scene {sn+1}..."):
                     next_state = LGState(
                         prompt=s["prompt"],
                         retrieved=s["retrieved"],
@@ -432,12 +419,11 @@ if st.session_state["lg_state"]:
                         st.session_state["lg_state"] = result2_dict
                         st.session_state["scenes"][sn + 1] = result2_dict["scene"]
 
-                        st.success(f"✅ Scene {sn + 1} ready!")
+                        st.success(f"✅ Scene {sn+1} ready!")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error: {str(e)}")
 
-    # Regenerate current scene
     with col2:
         if st.button("🔄 Regenerate Scene", use_container_width=True):
             with st.spinner("✨ Regenerating..."):
@@ -502,15 +488,11 @@ if len(st.session_state["scenes"]) > 1:
     st.markdown("---")
     st.subheader("📖 Complete Story")
 
-    # `sn` might not exist if user just generated but no lg_state yet, so guard
-    current_scene_number = (
-        st.session_state["lg_state"]["scene_number"]
-        if st.session_state["lg_state"]
-        else 1
-    )
-
     for k in sorted(st.session_state["scenes"].keys()):
-        with st.expander(f"Scene {k}", expanded=(k == current_scene_number)):
+        with st.expander(
+            f"Scene {k}",
+            expanded=(k == sn if st.session_state["lg_state"] else True)
+        ):
             st.write(st.session_state["scenes"][k])
 
     # Export option
