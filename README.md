@@ -64,7 +64,7 @@ The following diagram illustrates the core LangGraph-managed process for generat
                                 │                                              │
                                 ▼                                              │
                     ┌─────────────────────────┐                                │
-                    │ 👁️ Display Scene                                        │
+                    │ 👁️ Display Scene                                        
                     │       to User                                            │
                     └───────────┬─────────────┘                                │
                                 │                                              │
@@ -82,9 +82,9 @@ The following diagram illustrates the core LangGraph-managed process for generat
                                 │ 
                                 ▼
                     ┌─────────────────────────┐
-                    │ 📚 Story Assembly       |
-                    │ • Combine all scenes     |
-                    │ • Add title/formatting   │
+                    │ 📚 Story Assembly       
+                    │ • Combine all scenes     
+                    │ • Add title/formatting   
                     └───────────┬─────────────┘
                                 │
                                 ▼
